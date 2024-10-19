@@ -5,20 +5,28 @@ const port = 3000;
 
 app.use(express.json());
 
-const apiKey = "feb73b04-bb78-4d34-91bc-49f759b09ab9";
-const apiSecret = "kgzakiaju7";
+const apiKey = "feb73b04-bb78-4d34-91bc-49f759b09ab9"; // Your Upstox API Key
+const apiSecret = "sh3wmqncat"; // Your Upstox API Secret
 const redirectUri = "http://localhost:3000/api/callback"; // The URL where users will be redirected
-// Step 1: Redirect user to Upstox login
 
+// Step 1: Redirect user to Upstox login
 app.get("/api/login", (req, res) => {
-  const loginUrl = `https://api.upstox.com/v2/login/authorization/dialog?response_type=code&client_id=${apiKey}&redirect_uri=${redirectUri}&state=123`;
+  const loginUrl = `https://api.upstox.com/v2/login/authorization/dialog?response_type=code&client_id=${apiKey}&redirect_uri=${encodeURIComponent(
+    redirectUri
+  )}`;
   res.redirect(loginUrl);
 });
-// https://api.upstox.com/v2/login/authorization/dialog?response_type=code&client_id=<Your-API-Key-Here>&redirect_uri=<Your-Redirect-URI-Here>&state=<Your-Optional-State-Parameter-Here>
 
 // Step 2: Handle the authorization callback
 app.get("/api/callback", async (req, res) => {
-  const { code } = req.query;
+  const { code } = req.query; // This will pick up the 'code' parameter
+  console.log("Authorization code received:", code);
+
+  if (!code) {
+    return res.status(400).send("Authorization code missing");
+  }
+
+  // Prepare the data for exchanging the authorization code for an access token
   const data = new URLSearchParams({
     client_id: apiKey,
     client_secret: apiSecret,
@@ -26,7 +34,7 @@ app.get("/api/callback", async (req, res) => {
     grant_type: "authorization_code",
     redirect_uri: redirectUri,
   });
-console.log(data);
+  console.log("Data for token exchange:", data);
 
   const config = {
     headers: {
@@ -41,7 +49,7 @@ console.log(data);
       data,
       config
     );
-    console.log("response", response.data);
+    console.log("Token exchange response:", response.data);
 
     const accessToken = response.data.access_token;
 
@@ -50,30 +58,50 @@ console.log(data);
 
     res.send(pnlData);
   } catch (error) {
-    console.error(error);
+    if (error.response) {
+      console.error(
+        "Error during token exchange, Status:",
+        error.response.status
+      );
+      console.error("Response data:", error.response.data);
+    } else {
+      console.error("Error:", error.message);
+    }
     res.status(500).send("Error fetching token");
   }
 });
 
 // Helper function to fetch P&L data
 const getPnLData = async (token) => {
-  console.log("token", token);
+  const segment = "EQ"; // You can modify this to 'FO', 'COM', 'CD' based on what you need
+  const financialYear = "2324"; // Example: Financial year 2021-2022
+  const pageNumber = 1; // Start with page 1
+  const pageSize = 100; // You can adjust this based on the API's max limit
+  const fromDate = "01-04-2023"; // Example starting date (optional)
+  const toDate = "31-03-2024"; // Example end date (optional)
 
   try {
-    // Example API endpoint for fetching short-term positions
-    const positions = await axios.get(
+    const response = await axios.get(
       "https://api.upstox.com/v2/trade/profit-loss/data",
       {
         headers: {
           Authorization: `Bearer ${token}`,
           Accept: "application/json",
         },
+        params: {
+          segment,
+          financial_year: financialYear,
+          page_number: pageNumber,
+          page_size: pageSize,
+          from_date: fromDate, // Optional
+          to_date: toDate, // Optional
+        },
       }
     );
-    console.log(positions);
+    console.log("P&L data response:", response.data);
 
-    // Example P&L calculation based on the data
-    const pnl = positions?.data?.map((position) => {
+    // Process the P&L data
+    const pnl = response?.data?.map((position) => {
       const buyValue = position.buy_price;
       const sellValue = position.sell_price;
       const quantity = position.quantity;
@@ -82,15 +110,21 @@ const getPnLData = async (token) => {
         pnl: (sellValue - buyValue) * quantity,
       };
     });
-    // console.log(pnl);
+    console.log("Processed P&L data:", pnl);
 
     return pnl;
   } catch (error) {
-    
+    if (error.response) {
+      console.error("Error fetching P&L data, Status:", error.response.status);
+      console.error("Response data:", error.response.data);
+    } else {
+      console.error("Error:", error.message);
+    }
     return { error: "Error fetching P&L data" };
   }
 };
 
+// Start the server
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
 });
