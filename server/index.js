@@ -19,7 +19,7 @@ app.get("/api/login", (req, res) => {
 
 // Step 2: Handle the authorization callback
 app.get("/api/callback", async (req, res) => {
-  const { code } = req.query; // This will pick up the 'code' parameter
+  const { code } = req.query;
   console.log("Authorization code received:", code);
 
   if (!code) {
@@ -74,11 +74,11 @@ app.get("/api/callback", async (req, res) => {
 // Helper function to fetch P&L data
 const getPnLData = async (token) => {
   const segment = "EQ"; // You can modify this to 'FO', 'COM', 'CD' based on what you need
-  const financialYear = "2324"; // Example: Financial year 2021-2022
+  const financialYear = "2425"; // Example: Financial year 2021-2022
   const pageNumber = 1; // Start with page 1
   const pageSize = 100; // You can adjust this based on the API's max limit
-  const fromDate = "01-04-2023"; // Example starting date (optional)
-  const toDate = "31-03-2024"; // Example end date (optional)
+  const fromDate = "01-04-2024"; // Start date (investment date)
+  const toDate = "31-03-2025"; // End date (same as today)
 
   try {
     const response = await axios.get(
@@ -89,30 +89,30 @@ const getPnLData = async (token) => {
           Accept: "application/json",
         },
         params: {
-          segment,
-          financial_year: financialYear,
-          page_number: pageNumber,
-          page_size: pageSize,
-          from_date: fromDate, // Optional
-          to_date: toDate, // Optional
+          segment: "FO", // Equity segment for penny stocks
+          financial_year: "2425", // Financial year 2024-2025 (to match today's date)
+          page_number: 1,
+          page_size: 100,
+          from_date: fromDate, // Start date
+          to_date: toDate, // End date
         },
       }
     );
     console.log("P&L data response:", response.data);
 
     // Process the P&L data
-    const pnl = response?.data?.map((position) => {
-      const buyValue = position.buy_price;
-      const sellValue = position.sell_price;
-      const quantity = position.quantity;
-      return {
-        symbol: position.symbol,
-        pnl: (sellValue - buyValue) * quantity,
-      };
-    });
-    console.log("Processed P&L data:", pnl);
+    // const pnl = response?.data?.map((position) => {
+    //   const buyValue = position.buy_price;
+    //   const sellValue = position.sell_price;
+    //   const quantity = position.quantity;
+    //   return {
+    //     symbol: position.symbol,
+    //     pnl: (sellValue - buyValue) * quantity,
+    //   };
+    // });
+    // console.log("Processed P&L data:", pnl);
 
-    return pnl;
+    return response.data;
   } catch (error) {
     if (error.response) {
       console.error("Error fetching P&L data, Status:", error.response.status);
